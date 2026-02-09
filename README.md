@@ -1,13 +1,13 @@
-# Exam Project - Traveling Gold Collector
+# Exam project - Traveling gold collector
 
 ## Overview
 
-This repository contains my solution for the **Exam Project** of the course *Computational Intelligence (CI2025/26)*.
+This repository contains my solution for the **Exam project** of the course *Computational Intelligence (CI2025/26)*.
 It addresses a variant of the **Traveling Salesman Problem** where the goal is to collect gold from cities while minimizing the total travel cost, considering that carrying gold increases transportation costs.
 
 ---
 
-## Problem Definition
+## Problem definition
 
 The problem extends the classical TSP with a gold collection mechanism and dynamic travel costs.
 
@@ -30,7 +30,7 @@ The parameters α, β, and density define different problem variants with varyin
 
 ---
 
-## Representation of Solutions
+## Representation of solutions
 
 Solutions are represented as a list of tours, where each tour is a sequence of `(city, gold_amount)` tuples:
 
@@ -47,9 +47,9 @@ The final solution format includes `(0, 0)` markers between tours to indicate re
 
 ---
 
-## Solution Strategy
+## Solution strategy
 
-### 1. Distance Oracle
+### 1. Distance oracle
 
 For efficient distance lookups, a **DistanceOracle** class precomputes all-pairs shortest paths using Dijkstra's algorithm.
 * For large graphs (n ≥ 200), all distances are precomputed upfront
@@ -63,57 +63,57 @@ For efficient distance lookups, a **DistanceOracle** class precomputes all-pairs
 The algorithm employs **adaptive initialization strategies** based on problem parameters:
 
 #### For β < 1 (cost decreases with weight):
-* **Farthest-First Initialization**: builds a single tour visiting cities in order of decreasing distance from base
+* **Farthest-First initialization**: builds a single tour visiting cities in order of decreasing distance from base
 * Followed by **Iterated 2-Opt**: applies 2-opt edge swaps iteratively until no improvement is found
 * This approach works best because carrying more gold reduces cost, favoring single-tour solutions
 
 #### For β = 1 (linear cost):
-* **Greedy Initialization**: iteratively selects the nearest unvisited city weighted by its gold amount
+* **Greedy initialization**: iteratively selects the nearest unvisited city weighted by its gold amount
 * Fast variant for large instances (n ≥ 200) uses randomized selection
 
 #### For β > 1 (cost increases with weight):
-* **Greedy Partial Gold Collection**: builds multiple tours, collecting partial gold at each visit
+* **Greedy partial gold collection**: builds multiple tours, collecting partial gold at each visit
 * Limits carried gold to a threshold: `max_load = 500 / (α^(1/β))`
 * Cities can be visited multiple times to avoid carrying excessive weight
 * Fast variant for large instances uses randomized nearest-neighbor heuristic
 
 ---
 
-### 3. Optimization via Simulated Annealing
+### 3. Optimization via Simulated Annealing (SA)
 
-After initialization, the solution is refined using **Simulated Annealing** with the following neighborhood operators:
+After initialization, the solution is refined using **Simulated annealing** with the following neighborhood operators:
 
-#### Neighborhood Operators:
+#### Neighborhood operators:
 
 1. **Iterated 2-Opt** (30% probability):
    * Reverses tour segments to eliminate crossing edges
    * Iterates until local optimum is reached
    
-2. **Swap Visits Between Tours** (25% probability):
+2. **Swap visits between tours** (25% probability):
    * Exchanges `(city, gold)` visits between two different tours
    
-3. **Split Tour** (15% probability):
+3. **Split tour** (15% probability):
    * Divides a tour into two separate tours to reduce accumulated weight
    
-4. **Merge Tours** (10% probability):
+4. **Merge tours** (10% probability):
    * Combines two tours if it reduces total cost
    
-5. **Split Gold Collection** (10% probability):
+5. **Split gold collection** (10% probability):
    * Splits a single visit into two visits collecting partial gold
    
-6. **Relocate Segment** (5% probability):
+6. **Relocate segment** (5% probability):
    * Moves a sequence of visits from one tour to another
    
-7. **Random Reassign** (5% probability):
+7. **Random reassign** (5% probability):
    * Randomly reassigns a visit to a different tour for diversification
 
-#### Annealing Schedule:
+#### Annealing schedule:
 * Initial temperature: `T₀ = 0.1 × initial_cost`
 * Cooling rate: `T = T × 0.999` per iteration
 * Acceptance probability: `P(accept) = exp(-Δcost / T)`
 * **Early stopping**: terminates if no improvement for 1000 consecutive iterations
 
-#### Adaptive Iteration Counts:
+#### Adaptive iteration counts:
 * β > 1, density > 0.7: 10,000 steps (complex, multiple tours needed)
 * β > 1, density ≤ 0.7: 7,500 steps
 * β < 1: 2,000 steps (farthest-first + 2-opt already near-optimal)
@@ -121,13 +121,13 @@ After initialization, the solution is refined using **Simulated Annealing** with
 
 ---
 
-## Experimental Results
+## Experimental results
 
 The algorithm was benchmarked on 36 problem instances with varying parameters (N, β, density) with α fixed at 1.0.
 Below are the detailed results showing **Improvement %** (cost reduction over baseline) and execution times.
 
 ```
-N      β     Density   Baseline          My cost           Improvement %   Time (s)  
+N      β    Density       Baseline          My cost          Improvement %    Time (s)  
 ---------------------------------------------------------------------------------------
 100   0.5    0.3           1884.77          1391.65              26.2%        8.50
 100   0.5    0.6           1464.27          1300.09              11.2%       19.36
@@ -138,40 +138,40 @@ N      β     Density   Baseline          My cost           Improvement %   Time
 100   2.0    0.3        4403745.42       1118615.18              74.6%       28.00
 100   2.0    0.6        4860428.15        939793.93              80.7%       31.55
 100   2.0    1.0        5404978.09        748419.38              86.2%       46.39
-100   5.0    0.3       1.68e+14          1.34e+12                99.2%       26.66
-100   5.0    0.6       2.52e+14          3.71e+12                98.5%       27.48
-100   5.0    1.0       3.48e+14          1.42e+12                99.6%       45.63
+100   5.0    0.3          1.68e+14         1.34e+12              99.2%       26.66
+100   5.0    0.6          2.52e+14         3.71e+12              98.5%       27.48
+100   5.0    1.0          3.48e+14         1.42e+12              99.6%       45.63
 550   0.5    0.3           9874.06          7538.65              23.7%        9.78
 550   0.5    0.6           8575.81          7470.39              12.9%       11.01
 550   0.5    1.0           7459.64          7443.75               0.2%       10.22
 550   1.0    0.3         108273.81        108273.48               0.0%        3.36
 550   1.0    0.6         107009.18        107008.26               0.0%        6.50
 550   1.0    1.0         106544.96        106543.95               0.0%        6.25
-550   2.0    0.3       2.22e+07          1.03e+07                53.8%       62.56
-550   2.0    0.6       2.65e+07          9966496.08              62.4%       61.72
-550   2.0    1.0       3.12e+07          8911755.47              71.4%       93.72
-550   5.0    0.3       8.30e+14          5.01e+13                94.0%       61.76
-550   5.0    0.6       1.28e+15          5.56e+13                95.7%       60.70
-550   5.0    1.0       1.88e+15          4.09e+13                97.8%       93.97
+550   2.0    0.3          2.22e+07         1.03e+07              53.8%       62.56
+550   2.0    0.6          2.65e+07       9966496.08              62.4%       61.72
+550   2.0    1.0          3.12e+07       8911755.47              71.4%       93.72
+550   5.0    0.3          8.30e+14         5.01e+13              94.0%       61.76
+550   5.0    0.6          1.28e+15         5.56e+13              95.7%       60.70
+550   5.0    1.0          1.88e+15         4.09e+13              97.8%       93.97
 1000  0.5    0.3          17573.08         13527.20              23.0%       19.06
 1000  0.5    0.6          15270.40         13455.18              11.9%       16.75
 1000  0.5    1.0          13456.96         13434.23               0.2%       19.93
 1000  1.0    0.3         194204.60        194204.23               0.0%        7.05
 1000  1.0    0.6         193015.66        193014.83               0.0%        8.43
 1000  1.0    1.0         192936.23        192935.40               0.0%       13.83
-1000  2.0    0.3       4.01e+07          2.17e+07                45.8%       99.60
-1000  2.0    0.6       4.97e+07          2.23e+07                55.2%       99.35
-1000  2.0    1.0       5.76e+07          2.06e+07                64.3%      155.16
-1000  5.0    0.3       1.67e+15          1.50e+14                91.0%      105.18
-1000  5.0    0.6       2.79e+15          1.49e+14                94.7%      108.09
-1000  5.0    1.0       3.80e+15          1.35e+14                96.4%      151.00
+1000  2.0    0.3          4.01e+07         2.17e+07              45.8%       99.60
+1000  2.0    0.6          4.97e+07         2.23e+07              55.2%       99.35
+1000  2.0    1.0          5.76e+07         2.06e+07              64.3%      155.16
+1000  5.0    0.3          1.67e+15         1.50e+14              91.0%      105.18
+1000  5.0    0.6          2.79e+15         1.49e+14              94.7%      108.09
+1000  5.0    1.0          3.80e+15         1.35e+14              96.4%      151.00
 ```
 
 ---
 
-## Performance Analysis
+## Performance analysis
 
-### Key Observations:
+### Key observations:
 
 1. **β = 1.0** (linear cost): Solution is nearly optimal (~0.0% delta), as greedy initialization + SA quickly converges
 
@@ -192,7 +192,7 @@ N      β     Density   Baseline          My cost           Improvement %   Time
 
 ---
 
-## Code Structure
+## Code structure
 
 ```
 project-work/
@@ -210,6 +210,6 @@ project-work/
 
 ---
 
-**Author:** [s336732]  
+**Author:** [Riccardo Dattena - s336732]  
 **Course:** Computational Intelligence (CI2025/26)  
-**Exam Project — Traveling Gold Collector Problem**
+**Exam project — Traveling gold collector problem**
