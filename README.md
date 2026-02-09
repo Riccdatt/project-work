@@ -64,8 +64,8 @@ The algorithm employs **adaptive initialization strategies** based on problem pa
 
 #### For β < 1 (cost decreases with weight):
 * **Farthest-First initialization**: builds a single tour visiting cities in order of decreasing distance from base
-* Followed by **Iterated 2-Opt**: applies 2-opt edge swaps iteratively until no improvement is found
-* This approach works best because carrying more gold reduces cost, favoring single-tour solutions
+* **Iterated 2-Opt**: applies 2-opt edge swaps iteratively until no improvement is found
+* This approach works well because carrying more gold reduces cost, favoring single-tour solutions
 
 #### For β = 1 (linear cost):
 * **Greedy initialization**: iteratively selects the nearest unvisited city weighted by its gold amount
@@ -81,7 +81,7 @@ The algorithm employs **adaptive initialization strategies** based on problem pa
 
 ### 3. Optimization via Simulated Annealing (SA)
 
-After initialization, the solution is refined using **Simulated annealing** with the following neighborhood operators:
+After initialization, the solution is refined using **simulated annealing** with the following neighborhood operators:
 
 #### Neighborhood operators:
 
@@ -114,17 +114,20 @@ After initialization, the solution is refined using **Simulated annealing** with
 * **Early stopping**: terminates if no improvement for 1000 consecutive iterations
 
 #### Adaptive iteration counts:
-* β > 1, density > 0.7: 10,000 steps (complex, multiple tours needed)
+* β > 1, density > 0.7: 10,000 steps (since computing the initialization already takes long, I thought that taking some extra time to do more steps wouldn't be a bad idea in terms of time taken)
 * β > 1, density ≤ 0.7: 7,500 steps
 * β < 1: 2,000 steps (farthest-first + 2-opt already near-optimal)
-* β = 1: 2,500 steps
+* β = 1: 2,500 steps (since the baseline is already nearly optimal)
 
 ---
 
 ## Experimental results
 
-The algorithm was benchmarked on 36 problem instances with varying parameters (N, β, density) with α fixed at 1.0.
-Below are the detailed results showing **Improvement %** (cost reduction over baseline) and execution times.
+The algorithm was benchmarked on 36 problem instances with varying parameters (N, β, density) with α fixed at 1.0. I decided to show what I thought would be relevant problem instances:
+* N = 100, 550, 1000: to show a small, medium and high amount of cities
+* β = 0.5, 1.0, 2.0, 5.0: to show how results vary with β < 1, β = 1, β > 1 and β >> 1
+* density = 0.3, 0.6, 0.1: to show a small, medium and high value for density
+Below are the detailed results showing **Improvement %** (cost reduction over baseline) and execution times (not including the time taken to compute the baseline's cost).
 
 ```
 N      β    Density       Baseline          My cost          Improvement %    Time (s)  
@@ -173,11 +176,11 @@ N      β    Density       Baseline          My cost          Improvement %    T
 
 ### Key observations:
 
-1. **β = 1.0** (linear cost): Solution is nearly optimal (~0.0% delta), as greedy initialization + SA quickly converges
+1. **β = 1.0**: greedy initialization + SA quickly converges, without being able to overcome baseline. With linear costs there's not much room for improvement.
 
 2. **β < 1.0** (decreasing cost): 
    * Significant improvements (11-26%) over baseline
-   * Farthest-first + 2-opt strategy performs very well
+   * My strategy performs very well, showing all the benefits of starting from the farthest cities, since cost decreases with weight
    * Lower density benefits more from optimization
 
 3. **β > 1.0** (increasing cost):
