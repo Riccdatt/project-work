@@ -114,7 +114,7 @@ After initialization, the solution is refined using **simulated annealing** with
 * **Early stopping**: terminates if no improvement for 1000 consecutive iterations
 
 #### Adaptive iteration counts:
-* β > 1, density > 0.7: 10,000 steps (since computing the initialization already takes long, I thought that taking some extra time to do more steps wouldn't be a bad idea in terms of time taken)
+* β > 1, density > 0.7: 7,500 steps. Initially it was 10,000 steps, because since computing the initialization already takes long, I thought that taking some extra time to do more steps wouldn't be a bad idea in terms of time taken. But in order to avoid risking my code taking too long I put it back to 7,500
 * β > 1, density ≤ 0.7: 7,500 steps
 * β < 1: 2,000 steps (farthest-first + 2-opt already near-optimal)
 * β = 1: 2,500 steps (since the baseline is already nearly optimal)

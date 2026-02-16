@@ -18,7 +18,8 @@ class DistanceOracle:
         - show_progress: whether to display progress bar
         '''
         self.graph = graph
-        self.cache = {}
+        self.cache = {}  # Stores distances
+        self.paths = {}  # Stores shortest paths
         
         # For large graphs (n >= 200), pre-compute all distances to avoid lazy computation overhead
         n = len(graph.nodes)
@@ -27,18 +28,23 @@ class DistanceOracle:
 
     def precomputeAllDistances(self, show_progress=False):
         '''
-        Pre-compute all pairwise shortest path distances
+        Pre-compute all pairwise shortest path distances and paths
         - show_progress: whether to display progress bar
         '''
         if show_progress:
             from tqdm import tqdm
-            print("Pre-computing distance matrix...")
+            print("Pre-computing distance matrix and paths...")
             nodes = list(self.graph.nodes)
             for node in tqdm(nodes, desc="Distance Oracle"):
-                self.cache[node] = nx.single_source_dijkstra_path_length(self.graph, source=node, weight="dist")
+                lengths, paths = nx.single_source_dijkstra(self.graph, source=node, weight="dist")
+                self.cache[node] = lengths
+                self.paths[node] = paths
         else:
-            all_lengths = dict(nx.all_pairs_dijkstra_path_length(self.graph, weight="dist"))
-            self.cache = all_lengths
+            nodes = list(self.graph.nodes)
+            for node in nodes:
+                lengths, paths = nx.single_source_dijkstra(self.graph, source=node, weight="dist")
+                self.cache[node] = lengths
+                self.paths[node] = paths
 
     def dist(self, i: int, j: int) -> float:
         '''
@@ -50,10 +56,25 @@ class DistanceOracle:
         if i == j:
             return 0.0
         if i not in self.cache:
-            self.cache[i] = nx.single_source_dijkstra_path_length(
-                self.graph, source=i, weight="dist"
-            )
+            lengths, paths = nx.single_source_dijkstra(self.graph, source=i, weight="dist")
+            self.cache[i] = lengths
+            self.paths[i] = paths
         return self.cache[i][j]
+    
+    def path(self, i: int, j: int) -> list[int]:
+        '''
+        Get shortest path between two nodes
+        - i: source node ID
+        - j: target node ID
+        - returns: list of nodes in shortest path from i to j
+        '''
+        if i == j:
+            return [i]
+        if i not in self.paths:
+            lengths, paths = nx.single_source_dijkstra(self.graph, source=i, weight="dist")
+            self.cache[i] = lengths
+            self.paths[i] = paths
+        return self.paths[i][j]
 
 
 # <<< Solution >>>
@@ -623,11 +644,10 @@ def smartMerge(sol, problem, oracle):
     return sol
 
 
-def splitGoldCollection(sol: Solution, problem: Problem) -> Solution:
+def splitGoldCollection(sol: Solution) -> Solution:
     '''
     Split gold collection at a city into two separate visits
     - sol: input solution
-    - problem: problem instance
     - returns: modified solution
     '''
     sol = copy.deepcopy(sol)
@@ -657,11 +677,10 @@ def splitGoldCollection(sol: Solution, problem: Problem) -> Solution:
     return sol
 
 
-def mergeGoldVisits(sol: Solution, problem: Problem) -> Solution:
+def mergeGoldVisits(sol: Solution) -> Solution:
     '''
     Merge multiple visits to same city into one visit
     - sol: input solution
-    - problem: problem instance
     - returns: modified solution
     '''
     sol = copy.deepcopy(sol)
@@ -701,11 +720,10 @@ def mergeGoldVisits(sol: Solution, problem: Problem) -> Solution:
     return sol
 
 
-def randomReassign(sol: Solution, problem: Problem) -> Solution:
+def randomReassign(sol: Solution) -> Solution:
     '''
     Randomly reassign all visits to new tours
     - sol: input solution
-    - problem: problem instance
     - returns: modified solution
     '''
     sol = copy.deepcopy(sol)
@@ -726,29 +744,29 @@ def randomNeighbor(self, sol):
     if self.problem.beta == 1:
         ops += [
             lambda s: smartMerge(s, self.problem, self.oracle), 
-            lambda s: mergeGoldVisits(s, self.problem)
+            lambda s: mergeGoldVisits(s)
         ]
     elif self.problem.beta > 1:
         ops += [
             moveCityVisit, 
             splitTour, 
-            lambda s: splitGoldCollection(s, self.problem)
+            lambda s: splitGoldCollection(s)
         ]
         # Favor operators that create shorter trips
         if random.random() < 0.3:
-            ops.append(lambda s: splitGoldCollection(s, self.problem))
+            ops.append(lambda s: splitGoldCollection(s))
     else:  # beta < 1
         # For beta < 1, favor long tours with consolidation
         ops += [
             lambda s: smartMerge(s, self.problem, self.oracle),
-            lambda s: mergeGoldVisits(s, self.problem)
+            lambda s: mergeGoldVisits(s)
         ]
         # Favor merging to create longer tours
         if random.random() < 0.4:
             ops.append(lambda s: smartMerge(s, self.problem, self.oracle))
 
     if random.random() < 0.05:
-        ops.append(lambda s: randomReassign(s, self.problem))
+        ops.append(lambda s: randomReassign(s))
 
     return random.choice(ops)(sol)
 
@@ -885,7 +903,7 @@ class Solver:
         # For beta < 1, reduce SA steps since farthest-first + 2-opt already optimizes
         sa = SimulatedAnnealing(self.problem, self.oracle)
         if self.problem.beta > 1 and self.problem.density > 0.7:
-            steps = 10000
+            steps = 7500 # changed at last from 10k to 7.5k to save time
         elif self.problem.beta > 1 and self.problem.density <= 0.7:
             steps = 7500
         elif self.problem.beta < 1:
@@ -898,21 +916,39 @@ class Solver:
 
     def getSolution(self):
         '''
-        Get solution in required format
-        - returns: list of (city, cumulative_gold) tuples with (0, 0) between tours
+        Get solution in required format with expanded shortest paths
+        - returns: list of (city, cumulative_gold) tuples representing valid path in graph
         '''
         out = []
         
         for tour in self.best.tours:
-            # Accumulate gold while traversing tour
+            current_city = 0
             cumulative_gold = 0.0
             
-            for city, gold_amount in tour:
-                cumulative_gold += gold_amount
-                # Format: city and total accumulated gold so far
-                out.append((city, cumulative_gold))
+            for target_city, gold_amount in tour:
+                # Get shortest path from current to target city
+                path = self.oracle.path(current_city, target_city)
+                
+                # Add all intermediate cities in the path (excluding starting city, including target)
+                for node in path[1:]:
+                    # If this is the target city, add the gold
+                    if node == target_city:
+                        cumulative_gold += gold_amount
+                        out.append((node, cumulative_gold))
+                    else:
+                        # Intermediate city - no gold collected
+                        out.append((node, cumulative_gold))
+                
+                current_city = target_city
             
-            # Return to base to unload
-            out.append((0, 0))
+            # Return to base from last city
+            return_path = self.oracle.path(current_city, 0)
+            for node in return_path[1:]:
+                if node == 0:
+                    # Unload gold at base
+                    out.append((0, 0))
+                else:
+                    # Intermediate city - still carrying gold
+                    out.append((node, cumulative_gold))
         
         return out
